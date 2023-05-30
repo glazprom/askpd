@@ -1,0 +1,132 @@
+version: "3.9"
+
+networks:
+    askpd-network:
+        name: askpd-network
+        driver: bridge
+        external: true
+
+services:
+    mysql:
+        image: mysql:8.0
+        container_name: askpd-mysql
+        ports:
+            - '${DB_PORT:-3306}:${DB_PORT:-3306}'
+        environment:
+            MYSQL_ROOT_HOST: '%'
+            MYSQL_ROOT_PASSWORD: '${DB_ROOT_PASSWORD}'
+            MYSQL_USER: '${DB_USERNAME}'
+            MYSQL_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_DATABASE: '${DB_DATABASE}'
+            MYSQL_ALLOW_EMPTY_PASSWORD: 1
+        volumes:
+            - mysql:/var/lib/mysql
+            - ./storage/app/mysql:/app/mysql
+        healthcheck:
+            test: [ "CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}" ]
+            retries: 3
+            timeout: 5s
+        networks:
+            - askpd-network
+
+    mongo:
+        image: mongo:6.0.5
+        container_name: askpd-mongo
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USERNAME}
+            MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+            MONGODB_USERNAME: ${MONGODB_USERNAME}
+            MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+            MONGODB_DATABASE: ${MONGODB_DATABASE}
+        ports:
+            - ${MONGODB_PORT:-27017}:27017
+        networks:
+            - askpd-network
+        volumes:
+            - $PWD/docker/mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
+            - mongo_db:/data/db/
+            - mongo_configdb:/data/configdb/
+        depends_on:
+          - mysql
+
+    redis:
+        image: redis:alpine
+        container_name: askpd-redis
+        healthcheck:
+            test: [ "CMD", "redis-cli", "ping" ]
+            retries: 3
+            timeout: 3s
+        command:
+            - '--maxmemory 128M'
+        networks:
+            - askpd-network
+        volumes:
+            - redis:/data/
+        depends_on:
+            - mysql
+            - mongo
+
+    php:
+        container_name: askpd-php
+        build:
+            context: $PWD/docker/php
+            target: php_app
+        ports:
+            - '${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}'
+        networks:
+            - askpd-network
+        volumes:
+            - $PWD/docker/php/conf/php.ini:/usr/local/etc/php/conf.d/docker.ini
+            - $PWD/:/var/www/html/
+        depends_on:
+          - redis
+
+    supervisor:
+        container_name: askpd-supervisor
+        build:
+            context: $PWD/docker/php
+            target: php_supervisor
+        command: supervisord -n
+        networks:
+            - askpd-network
+        volumes:
+            - $PWD/docker/supervisor/conf/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+            - $PWD/:/var/www/html/
+        depends_on:
+            - php
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
+
+    nginx:
+        image: nginx:alpine
+        container_name: askpd-nginx
+        environment:
+            NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-askpd-php}
+        ports:
+            - ${NGINX_HTTP_PORT:-80}:80
+            - ${NGINX_HTTPS_PORT:-443}:443
+        networks:
+            - askpd-network
+        volumes:
+            - $PWD/docker/nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+            - $PWD/docker/nginx/templates/:/etc/nginx/templates/
+            - $PWD/docker/nginx/ssl/:/etc/nginx/ssl/
+            - $PWD/:/var/www/html/
+        depends_on:
+            - php
+
+volumes:
+    redis:
+        name: askpd-redis-volume
+        driver: local
+    mysql:
+        name: askpd-mysql-volume
+        driver: local
+    mongo_db:
+        name: askpd-mongo_db
+        driver: local
+    mongo_configdb:
+        name: askpd-mongo_configdb
+        driver: local

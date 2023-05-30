@@ -1,0 +1,61 @@
+@import "colors"
+$font: 'Nunito', sans-serif
+
+body
+    padding: 0
+    margin: 0
+    font-size: 1rem
+    color: $colorBlack
+    background: $colorLight
+
+*, html, body, h1, h2, h3, h4, h5, h6, input, textarea, legend, form, select, label, a
+    font-family: $font
+
+input, textarea, legend, form, select, label, a
+    transition: .12s linear
+    &:hover, &:focus
+        transition: .12s linear
+    &.active
+        transition: .12s linear
+        &:hover, &:focus
+            transition: .12s linear
+
+a
+    color: $colorBlue
+    &:hover
+        color: $colorBlueDark
+
+h1, h2, h3, h4, h5, h6
+    font-weight: normal
+
+.workspace
+    width: 100%
+    padding: 0
+    display: grid
+    grid-template-columns: 5% 90% 5%
+    margin: 2em 0 0
+    .content
+        width: 100%
+        display: grid
+        grid-template-columns: 320px calc(100% - 320px)
+        grid-gap: 1em
+        min-height: 70vh
+        position: relative
+
+.workspace-area
+    width: calc(100% - 3em)
+    padding: 1em 1.5em
+    display: flex
+    flex-direction: column
+    align-items: flex-start
+    justify-content: flex-start
+    background: $colorWhite
+    border-radius: 1em
+    box-shadow: 0 0 2em rgba(0,0,0,.1)
+    h2
+        margin: 0 0 .32em
+        font-weight: 300
+        color: $colorBlue
+        width: 100%
+        border-bottom: 1px solid $colorLight
+        padding-bottom: .32em
